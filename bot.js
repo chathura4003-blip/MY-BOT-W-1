@@ -141,6 +141,17 @@ async function connect() {
     }
   });
 
+  sock.ev.on("group-participants.update", async (update) => {
+    try {
+      const { onGroupUpdate } = require("./lib/handler");
+      if (typeof onGroupUpdate === "function") {
+        await onGroupUpdate(sock, update);
+      }
+    } catch (err) {
+      logger(`[Bot] Group update error: ${err.message}`);
+    }
+  });
+
   return sock;
 }
 
