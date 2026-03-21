@@ -359,14 +359,20 @@
     <div class="login-card">
       <div class="field-group">
         <label>Username</label>
-        <input id="u" type="text" placeholder="Enter username" autocomplete="username"/>
+        <input id="u" type="text" placeholder="admin" autocomplete="username"/>
       </div>
       <div class="field-group">
         <label>Password</label>
-        <input id="p" type="password" placeholder="Enter password" autocomplete="current-password"/>
+        <input id="p" type="password" placeholder="changeme123" autocomplete="current-password"/>
       </div>
       <button class="login-btn" onclick="doLogin()">Sign In</button>
       <div id="login-error"></div>
+      <div style="margin-top:0.85rem;text-align:center;font-size:0.78rem;color:var(--text3)">
+        Default: <code style="background:var(--input);padding:1px 5px;border-radius:4px;color:var(--text2)">admin</code> /
+        <code style="background:var(--input);padding:1px 5px;border-radius:4px;color:var(--text2)">changeme123</code>
+        &nbsp;·&nbsp;
+        <span style="cursor:pointer;color:var(--accent);text-decoration:underline" onclick="document.getElementById('u').value='admin';document.getElementById('p').value='changeme123'">Autofill</span>
+      </div>
     </div>
   </div>
 </div>

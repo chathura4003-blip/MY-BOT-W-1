@@ -45,10 +45,12 @@ function createDashboard(getSock) {
         const authHeader = req.headers.authorization || '';
         const b64 = authHeader.startsWith('Basic ') ? authHeader.slice(6) : '';
         if (!b64) {
-            res.setHeader('WWW-Authenticate', 'Basic realm="Bot Admin"');
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        const [user, pass] = Buffer.from(b64, 'base64').toString().split(':');
+        const decoded = Buffer.from(b64, 'base64').toString();
+        const colonIdx = decoded.indexOf(':');
+        const user = decoded.slice(0, colonIdx);
+        const pass = decoded.slice(colonIdx + 1);
         if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
