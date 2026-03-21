@@ -7,7 +7,13 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     git \
+    curl \
+    ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Pre-download yt-dlp for Linux to avoid runtime failures
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
 
 # Set working directory
 WORKDIR /app
