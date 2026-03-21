@@ -1,22 +1,21 @@
-# Use Node.js 20 slim as base
-FROM node:20-slim
+# Use Node.js 20 as base for better dependency support
+FROM node:20
+
+# Set working directory
+WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ffmpeg \
     python3 \
-    python3-pip \
     git \
     curl \
     ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Pre-download yt-dlp for Linux to avoid runtime failures
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp
-
-# Set working directory
-WORKDIR /app
+# Pre-download yt-dlp for Linux (Application Root)
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /app/yt-dlp \
+    && chmod a+rx /app/yt-dlp
 
 # Copy package files and install dependencies
 COPY package.json package-lock.json* ./
