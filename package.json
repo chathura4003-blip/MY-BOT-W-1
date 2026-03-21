@@ -4,8 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "dev": "node --max-old-space-size=384 index.js",
-    "start": "node --max-old-space-size=384 index.js"
+    "dev": "node --max-old-space-size=256 --expose-gc index.js",
+    "start": "node --max-old-space-size=256 --expose-gc index.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",

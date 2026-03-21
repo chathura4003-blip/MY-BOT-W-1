@@ -48,7 +48,19 @@ async function connect() {
     markOnlineOnConnect: true,
     retryRequestDelayMs: 2000,
     maxMsgRetryCount: 3,
+    syncFullHistory: false,
+    generateHighQualityLinkPreviews: false,
   });
+
+  // Aggressive Memory Sweeping
+  if (global.gc) {
+    const gcSweep = setInterval(() => {
+      try {
+        global.gc();
+      } catch (err) { }
+    }, 5 * 60 * 1000);
+    gcSweep.unref();
+  }
 
   sock.ev.on(
     "connection.update",
