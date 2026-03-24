@@ -3,7 +3,7 @@
 const path = require('path');
 
 module.exports = {
-    BOT_NAME: process.env.BOT_NAME || 'Supreme Bot',
+    BOT_NAME: process.env.BOT_NAME || 'CHATHU MD',
     OWNER_NUMBER: process.env.OWNER_NUMBER || '94742514900', // Default owner
     PREFIX: process.env.PREFIX || '.',
     PORT: parseInt(process.env.PORT) || 5000,
@@ -18,8 +18,8 @@ module.exports = {
 
     BROWSER: ['SupremeBot', 'Chrome', '131.0'],
 
-    AUTO_READ: process.env.AUTO_READ !== 'false',
-    AUTO_TYPING: process.env.AUTO_TYPING !== 'false',
+    AUTO_READ: process.env.AUTO_READ !== 'true',
+    AUTO_TYPING: process.env.AUTO_TYPING !== 'true',
     NSFW_ENABLED: process.env.NSFW_ENABLED !== 'false',
     WORK_MODE: process.env.WORK_MODE || 'public', // Set to 'public' to work for everyone
 
