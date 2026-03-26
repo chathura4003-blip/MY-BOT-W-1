@@ -1,53 +1,83 @@
 # 🛸 Premium MD — WhatsApp AI Bot
 
-A world-class, feature-rich WhatsApp bot with a stunning Cyberpunk dashboard and advanced AI capabilities.
+A production-minded WhatsApp bot built on **Baileys**, with an admin dashboard, moderation utilities, automation commands, media/download workflows, and AI integrations.
 
-## ✨ Premium Features
-- **Modern Dashboard**: Sleek glassmorphic admin panel with real-time monitoring.
-- **Auto-Bio Flux**: Automated profile status updates with system health.
-- **Elegant UI**: Sophisticated unicode message formatting.
-- **AI Integration**: Powered by advanced language models for chat and image gen.
+## 🚀 Highlights
+- **Real-time Dashboard** for connection status, QR login, logs, network speed, and moderation controls.
+- **Command Modules** split by domain (`ai`, `group`, `download`, `search`, `economy`, `owner`, etc.).
+- **Persistent Local Storage** for bans/mods and runtime bot state.
+- **Media Tooling** via ffmpeg + yt-dlp wrapper support.
+- **Deploy-ready** setup for local, Docker, Render, and Procfile-based environments.
 
-## Prerequisites
-- Node.js (v16 or higher)
-- ffmpeg (for media processing)
+## 🧱 Tech Stack
+- Node.js (CommonJS)
+- `@whiskeysockets/baileys`
+- Express dashboard + Socket tooling
+- `systeminformation` for host metrics
+- `yt-dlp-wrap` for download workflows
 
-## Installation
+## ✅ Prerequisites
+- **Node.js 18+** recommended (Node 16 may run but 18+ is safer for modern deps).
+- **ffmpeg** installed and available in PATH.
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/Bot-Fixer.git
-    cd Bot-Fixer
-    ```
+## 📦 Installation
+```bash
+git clone https://github.com/YOUR_USERNAME/Bot-Fixer.git
+cd Bot-Fixer
+npm install
+```
 
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    # OR
-    pnpm install
-    ```
+## ⚙️ Configuration
+Create and edit your env file:
+```bash
+cp .env.example .env
+```
 
-3.  **Configure environment variables**:
-    Copy `.env.example` to `.env` and fill in your details.
-    ```bash
-    cp .env.example .env
-    ```
+Core values:
+- `OWNER_NUMBER` → WhatsApp number in international format (digits only).
+- `PREFIX` → command prefix (default: `.`).
+- `BOT_NAME` → visible bot name.
+- `ADMIN_USER` / `ADMIN_PASS` → dashboard basic-auth credentials.
+- `JWT_SECRET` → rotate for production use.
 
-4.  **Start the bot**:
-    ```bash
-    npm start
-    ```
+> **Security note:** Never keep default dashboard credentials in production.
 
-## Configuration
-Edit `config.js` or use environment variables:
-- `OWNER_NUMBER`: Your WhatsApp number (e.g., 94742514900)
-- `PREFIX`: Command prefix (default: `.`)
-- `BOT_NAME`: Name of your bot
+## ▶️ Run
+```bash
+npm start
+```
 
-## Dashboard
-The bot includes a web dashboard accessible at `http://localhost:5000` (or your configured port).
-- Default Admin: `admin`
-- Default Password: `changeme123`
+For development:
+```bash
+npm run dev
+```
 
-## License
+## 🖥️ Dashboard
+- URL: `http://localhost:5000` (or your configured `PORT`/`DASHBOARD_PORT`)
+- Auth: HTTP Basic Auth using `ADMIN_USER` and `ADMIN_PASS` from `.env`
+
+Main endpoints exposed in dashboard router:
+- `GET /api/status`
+- `GET /api/qr`
+- `GET /api/logs?limit=100`
+- `GET /api/speed`
+- `GET/POST/DELETE /api/mods`
+- `GET/POST/DELETE /api/bans`
+- `POST /api/restart`
+- `POST /api/logout`
+
+## 🐳 Docker
+A Dockerfile is included:
+```bash
+docker build -t premium-md .
+docker run --env-file .env -p 5000:5000 premium-md
+```
+
+## 🧪 Health & Ops Tips
+- Ensure persistent volume mapping for session/database files when deploying.
+- Keep `OWNER_NUMBER` and admin secrets in environment variables, not hardcoded.
+- Rotate auth credentials periodically.
+- Monitor memory/uptime from the dashboard and restart gracefully when needed.
+
+## 📄 License
 MIT

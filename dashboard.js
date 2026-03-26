@@ -3,6 +3,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const si = require('systeminformation');
 const state = require('./state');
 const { clearSession } = require('./session-manager');
@@ -14,6 +15,21 @@ let _prevNet = null;
 let _speed = { dlKbps: 0, ulKbps: 0, totalDlMB: 0, totalUlMB: 0 };
 let _sessionStartRx = null;
 let _sessionStartTx = null;
+
+
+function _safeEquals(a, b) {
+    const aBuf = Buffer.from(String(a ?? ''), 'utf8');
+    const bBuf = Buffer.from(String(b ?? ''), 'utf8');
+    if (aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+function _toJid(number) {
+    const sanitized = String(number || '').replace(/\D/g, '');
+    if (!sanitized || sanitized.length < 8 || sanitized.length > 15) return null;
+    return `${sanitized}@s.whatsapp.net`;
+}
+
 
 async function _sampleNet() {
     try {
@@ -55,13 +71,25 @@ function createDashboard(getSock) {
         const authHeader = req.headers.authorization || '';
         const b64 = authHeader.startsWith('Basic ') ? authHeader.slice(6) : '';
         if (!b64) {
+            res.set('WWW-Authenticate', 'Basic realm="Premium Dashboard"');
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        const decoded = Buffer.from(b64, 'base64').toString();
+
+        let decoded = '';
+        try {
+            decoded = Buffer.from(b64, 'base64').toString('utf8');
+        } catch {
+            return res.status(401).json({ error: 'Invalid authorization header' });
+        }
+
         const colonIdx = decoded.indexOf(':');
+        if (colonIdx < 0) {
+            return res.status(401).json({ error: 'Invalid authorization format' });
+        }
+
         const user = decoded.slice(0, colonIdx);
         const pass = decoded.slice(colonIdx + 1);
-        if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+        if (!_safeEquals(user, ADMIN_USER) || !_safeEquals(pass, ADMIN_PASS)) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         next();
@@ -85,7 +113,8 @@ function createDashboard(getSock) {
     });
 
     router.get('/api/logs', requireAuth, (req, res) => {
-        const limit = parseInt(req.query.limit) || 100;
+        const requestedLimit = Number.parseInt(req.query.limit, 10);
+        const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 100;
         res.json({ logs: (getLogs?.() || []).slice(-limit) });
     });
 
@@ -103,8 +132,8 @@ function createDashboard(getSock) {
 
     router.post('/api/mods', requireAuth, (req, res) => {
         const { number } = req.body || {};
-        if (!number) return res.status(400).json({ error: 'number required' });
-        const jid = `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+        const jid = _toJid(number);
+        if (!jid) return res.status(400).json({ error: 'valid number required (8-15 digits)' });
         db.update('mods', jid, { mod: true, addedAt: Date.now() });
         logger(`[Dashboard] Mod added: ${jid}`);
         res.json({ ok: true, jid });
@@ -127,8 +156,8 @@ function createDashboard(getSock) {
 
     router.post('/api/bans', requireAuth, (req, res) => {
         const { number } = req.body || {};
-        if (!number) return res.status(400).json({ error: 'number required' });
-        const jid = `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+        const jid = _toJid(number);
+        if (!jid) return res.status(400).json({ error: 'valid number required (8-15 digits)' });
         db.update('bans', jid, { banned: true, at: Date.now() });
         logger(`[Dashboard] Ban added: ${jid}`);
         res.json({ ok: true, jid });
