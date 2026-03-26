@@ -3,6 +3,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const si = require('systeminformation');
 const state = require('./state');
 const { clearSession } = require('./session-manager');
@@ -51,17 +52,41 @@ function createDashboard(getSock) {
     app.use(express.static(path.join(__dirname, 'public')));
     app.use('/bot-panel', express.static(path.join(__dirname, 'public')));
 
+    function safeEqual(a, b) {
+        const left = Buffer.from(String(a));
+        const right = Buffer.from(String(b));
+        if (left.length !== right.length) return false;
+        return crypto.timingSafeEqual(left, right);
+    }
+
+    function parseBasicAuth(header) {
+        if (!header || !header.startsWith('Basic ')) return null;
+        try {
+            const encoded = header.slice(6).trim();
+            const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+            const colonIdx = decoded.indexOf(':');
+            if (colonIdx < 0) return null;
+            return {
+                user: decoded.slice(0, colonIdx),
+                pass: decoded.slice(colonIdx + 1),
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    function parseWhatsAppNumber(number) {
+        const clean = String(number || '').replace(/\D/g, '');
+        return clean.length >= 8 ? clean : null;
+    }
+
     function requireAuth(req, res, next) {
-        const authHeader = req.headers.authorization || '';
-        const b64 = authHeader.startsWith('Basic ') ? authHeader.slice(6) : '';
-        if (!b64) {
+        const creds = parseBasicAuth(req.headers.authorization || '');
+        if (!creds) {
+            res.setHeader('WWW-Authenticate', 'Basic realm="Bot Dashboard"');
             return res.status(401).json({ error: 'Unauthorized' });
         }
-        const decoded = Buffer.from(b64, 'base64').toString();
-        const colonIdx = decoded.indexOf(':');
-        const user = decoded.slice(0, colonIdx);
-        const pass = decoded.slice(colonIdx + 1);
-        if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+        if (!safeEqual(creds.user, ADMIN_USER) || !safeEqual(creds.pass, ADMIN_PASS)) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
         next();
@@ -85,7 +110,7 @@ function createDashboard(getSock) {
     });
 
     router.get('/api/logs', requireAuth, (req, res) => {
-        const limit = parseInt(req.query.limit) || 100;
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 1000);
         res.json({ logs: (getLogs?.() || []).slice(-limit) });
     });
 
@@ -102,9 +127,10 @@ function createDashboard(getSock) {
     });
 
     router.post('/api/mods', requireAuth, (req, res) => {
-        const { number } = req.body || {};
-        if (!number) return res.status(400).json({ error: 'number required' });
-        const jid = `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+        const rawNumber = req.body?.number;
+        const number = parseWhatsAppNumber(rawNumber);
+        if (!number) return res.status(400).json({ error: 'valid number required' });
+        const jid = `${number}@s.whatsapp.net`;
         db.update('mods', jid, { mod: true, addedAt: Date.now() });
         logger(`[Dashboard] Mod added: ${jid}`);
         res.json({ ok: true, jid });
@@ -126,9 +152,10 @@ function createDashboard(getSock) {
     });
 
     router.post('/api/bans', requireAuth, (req, res) => {
-        const { number } = req.body || {};
-        if (!number) return res.status(400).json({ error: 'number required' });
-        const jid = `${number.replace(/\D/g, '')}@s.whatsapp.net`;
+        const rawNumber = req.body?.number;
+        const number = parseWhatsAppNumber(rawNumber);
+        if (!number) return res.status(400).json({ error: 'valid number required' });
+        const jid = `${number}@s.whatsapp.net`;
         db.update('bans', jid, { banned: true, at: Date.now() });
         logger(`[Dashboard] Ban added: ${jid}`);
         res.json({ ok: true, jid });
