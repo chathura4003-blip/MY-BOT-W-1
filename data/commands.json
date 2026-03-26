@@ -1,0 +1,22 @@
+{
+  "commands": [
+    {
+      "name": "ping",
+      "aliases": ["p"],
+      "response": "🏓 Pong!",
+      "cooldownSec": 3,
+      "permission": "user",
+      "category": "system",
+      "enabled": true
+    },
+    {
+      "name": "help",
+      "aliases": ["menu"],
+      "response": "Use the admin panel to manage dynamic commands.",
+      "cooldownSec": 0,
+      "permission": "user",
+      "category": "general",
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "id": "owner",
+      "username": "admin",
+      "passwordHash": "240be518fabd2724ddb6f04eeb716d4c7f3f65c6d6f2d2225faeb4f22f7436f9",
+      "role": "owner"
+    }
+  ]
+}

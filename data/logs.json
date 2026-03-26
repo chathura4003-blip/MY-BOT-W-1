@@ -1,0 +1,27 @@
+{
+  "entries": [
+    {
+      "ts": "2026-03-26T05:35:35.333Z",
+      "level": "info",
+      "message": "Loaded plugins: 1",
+      "meta": {}
+    },
+    {
+      "ts": "2026-03-26T05:35:35.650Z",
+      "level": "info",
+      "message": "Admin API + panel running on http://0.0.0.0:5000",
+      "meta": {}
+    },
+    {
+      "ts": "2026-03-26T05:35:35.669Z",
+      "level": "error",
+      "message": "Session primary disconnected (408)",
+      "meta": {}
+    }
+  ],
+  "analytics": {
+    "messages": 0,
+    "commands": 0,
+    "errors": 0
+  }
+}

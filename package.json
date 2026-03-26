@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "node --max-old-space-size=256 --expose-gc index.js",
-    "start": "node --max-old-space-size=256 --expose-gc index.js"
+    "start": "node --max-old-space-size=256 --expose-gc index.js",
+    "test": "node tests/command-service.test.js"
   },
   "dependencies": {
     "@hapi/boom": "^10.0.1",

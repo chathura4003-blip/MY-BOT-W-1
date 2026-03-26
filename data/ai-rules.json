@@ -1,0 +1,9 @@
+{
+  "rules": [
+    {
+      "match": "hello bot",
+      "reply": "Hello 👋 I am online.",
+      "enabled": true
+    }
+  ]
+}

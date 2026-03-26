@@ -1,53 +1,70 @@
-# 🛸 Premium MD — WhatsApp AI Bot
+# Modular WhatsApp Bot (Baileys + JSON + Admin Panel)
 
-A world-class, feature-rich WhatsApp bot with a stunning Cyberpunk dashboard and advanced AI capabilities.
+Refactored Node.js WhatsApp bot with a modular architecture and **no external database**.
 
-## ✨ Premium Features
-- **Modern Dashboard**: Sleek glassmorphic admin panel with real-time monitoring.
-- **Auto-Bio Flux**: Automated profile status updates with system health.
-- **Elegant UI**: Sophisticated unicode message formatting.
-- **AI Integration**: Powered by advanced language models for chat and image gen.
+## Architecture
 
-## Prerequisites
-- Node.js (v16 or higher)
-- ffmpeg (for media processing)
+- `core/engine/` - WhatsApp runtime + multi-session bot engine
+- `core/services/` - JSON storage, auth, commands, plugins, events, logs, queue
+- `core/api/` - Express API + Socket.IO server
+- `plugins/` - Feature plugins (enable/disable from panel/API)
+- `events/` - Event hooks (`message.received`, `group.participant`, `command.executed`)
+- `config/` - App configuration
+- `data/` - JSON persistence
+- `public/` - Admin web dashboard
 
-## Installation
+## JSON Storage Files
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/Bot-Fixer.git
-    cd Bot-Fixer
-    ```
+- `data/commands.json`
+- `data/users.json`
+- `data/sessions.json`
+- `data/logs.json`
+- `data/events.json`
+- `data/ai-rules.json`
 
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    # OR
-    pnpm install
-    ```
+## Features Implemented
 
-3.  **Configure environment variables**:
-    Copy `.env.example` to `.env` and fill in your details.
-    ```bash
-    cp .env.example .env
-    ```
+- Dynamic command system from JSON (category, permission, cooldown, enabled flag)
+- Plugin system with runtime enable/disable
+- Event system with toggles and custom handlers
+- Admin API with JWT + RBAC (Owner/Admin/Moderator)
+- Real-time logs/status over Socket.IO
+- Multi-session support (add/remove sessions, QR retrieval)
+- In-memory queue for broadcast tasks
+- Optional AI auto-reply rules from JSON
+- Legacy command compatibility bridge plugin to keep existing `lib/commands/*` behavior working while migrating.
+- Lightweight and compatible with VPS/Termux (file-based JSON storage)
 
-4.  **Start the bot**:
-    ```bash
-    npm start
-    ```
+## Setup
 
-## Configuration
-Edit `config.js` or use environment variables:
-- `OWNER_NUMBER`: Your WhatsApp number (e.g., 94742514900)
-- `PREFIX`: Command prefix (default: `.`)
-- `BOT_NAME`: Name of your bot
+```bash
+npm install
+npm start
+npm test
+```
 
-## Dashboard
-The bot includes a web dashboard accessible at `http://localhost:5000` (or your configured port).
-- Default Admin: `admin`
-- Default Password: `changeme123`
+Open dashboard at:
 
-## License
-MIT
+- `http://localhost:5000`
+- or set `PUBLIC_BASE_URL` (example: `https://your-domain.com`) so logs/API return your shareable link.
+
+Default login is loaded from `ADMIN_USER` / `ADMIN_PASS` environment variables on first run.
+
+## Main API Examples
+
+- `POST /api/auth/login`
+- `GET /api/status`
+- `GET/POST/DELETE /api/commands`
+- `GET/PATCH /api/plugins/:id`
+- `GET/PATCH /api/events/:name`
+- `GET/POST/PATCH/DELETE /api/sessions`
+- `GET /api/sessions/:id/qr`
+- `POST /api/messages/send`
+- `POST /api/messages/broadcast`
+- `GET/PUT /api/ai-rules`
+- `POST /api/restart`
+
+## Notes
+
+- This refactor keeps the project Node.js + Baileys based and moves it to a scalable modular engine.
+- Existing files are preserved, while `index.js` now boots the new modular runtime.

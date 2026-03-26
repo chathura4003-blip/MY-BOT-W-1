@@ -1,0 +1,7 @@
+{
+  "events": {
+    "message.received": true,
+    "group.participant": true,
+    "command.executed": true
+  }
+}

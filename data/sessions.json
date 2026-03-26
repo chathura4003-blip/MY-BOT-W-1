@@ -1,0 +1,10 @@
+{
+  "sessions": [
+    {
+      "id": "primary",
+      "label": "Primary Account",
+      "active": true,
+      "createdAt": 0
+    }
+  ]
+}
