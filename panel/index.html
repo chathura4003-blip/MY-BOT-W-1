@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WA Bot Admin</title>
+  <style>body{font-family:Arial;margin:20px;background:#0f172a;color:#e2e8f0}input,button,textarea{margin:4px;padding:8px}section{border:1px solid #334155;padding:12px;margin-bottom:12px;border-radius:8px}pre{max-height:200px;overflow:auto;background:#020617;padding:10px}</style>
+</head>
+<body>
+  <h1>WhatsApp Bot Admin Panel</h1>
+  <section>
+    <h3>Login</h3>
+    <input id="username" placeholder="username" value="owner" />
+    <input id="password" placeholder="password" type="password" value="owner123" />
+    <button onclick="login()">Login</button>
+    <p id="loginStatus"></p>
+  </section>
+
+  <section>
+    <h3>Dashboard</h3>
+    <button onclick="loadStatus()">Refresh Status</button>
+    <pre id="status"></pre>
+  </section>
+
+  <section>
+    <h3>Commands</h3>
+    <button onclick="loadCommands()">Load Commands</button>
+    <pre id="commands"></pre>
+  </section>
+
+  <section>
+    <h3>Plugins</h3>
+    <button onclick="loadPlugins()">Load Plugins</button>
+    <pre id="plugins"></pre>
+  </section>
+
+  <section>
+    <h3>Broadcast</h3>
+    <textarea id="broadcastRecipients" placeholder="jid1,jid2"></textarea><br>
+    <textarea id="broadcastMessage" placeholder="message"></textarea><br>
+    <button onclick="broadcast()">Send Broadcast</button>
+  </section>
+
+  <section>
+    <h3>Live Logs</h3>
+    <pre id="logs"></pre>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    let token = '';
+    const api = (path, options={}) => fetch(path, { ...options, headers: { 'Content-Type':'application/json', Authorization: token ? `Bearer ${token}` : '' } }).then(r=>r.json());
+
+    async function login(){
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const res = await api('/api/auth/login',{method:'POST',body:JSON.stringify({username,password})});
+      token = res.token || '';
+      document.getElementById('loginStatus').textContent = token ? 'Logged in' : JSON.stringify(res);
+    }
+    async function loadStatus(){ document.getElementById('status').textContent = JSON.stringify(await api('/api/status'),null,2); }
+    async function loadCommands(){ document.getElementById('commands').textContent = JSON.stringify(await api('/api/commands'),null,2); }
+    async function loadPlugins(){ document.getElementById('plugins').textContent = JSON.stringify(await api('/api/plugins'),null,2); }
+    async function broadcast(){
+      const recipients = document.getElementById('broadcastRecipients').value.split(',').map(v=>v.trim()).filter(Boolean);
+      const text = document.getElementById('broadcastMessage').value;
+      const res = await api('/api/messages/broadcast',{method:'POST',body:JSON.stringify({recipients,text})});
+      alert(JSON.stringify(res));
+    }
+
+    const socket = io();
+    socket.on('log', (entry) => {
+      const box = document.getElementById('logs');
+      box.textContent += `[${entry.level}] ${entry.message}\n`;
+      box.scrollTop = box.scrollHeight;
+    });
+  </script>
+</body>
+</html>

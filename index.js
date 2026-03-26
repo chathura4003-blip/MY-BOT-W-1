@@ -1,18 +1,12 @@
 'use strict';
 
-const { startBot, getSock } = require('./bot');
-const { startDashboard } = require('./dashboard');
-const { logger } = require('./logger');
+const { startBot } = require('./bot');
+const { logger } = require('./core/logger');
 
-process.on('uncaughtException',  err => logger(`[UNCAUGHT]  ${err.message}\n${err.stack}`));
-process.on('unhandledRejection', err => logger(`[UNHANDLED] ${err?.message || err}`));
+process.on('uncaughtException', (err) => logger.error(`Uncaught: ${err.message}`, { stack: err.stack }));
+process.on('unhandledRejection', (err) => logger.error(`Unhandled rejection: ${err?.message || err}`));
 
-(async () => {
-    try {
-        startDashboard(getSock);
-        await startBot();
-    } catch (err) {
-        logger(`[Index] Fatal startup error: ${err.message}`);
-        process.exit(1);
-    }
-})();
+startBot().catch((error) => {
+  logger.error(`Startup failed: ${error.message}`, { stack: error.stack });
+  process.exit(1);
+});

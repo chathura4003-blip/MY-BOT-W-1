@@ -1,0 +1,6 @@
+{
+  "plugins": {
+    "ping": { "enabled": true },
+    "echo": { "enabled": true }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "enabled": false,
+  "rules": [
+    {
+      "pattern": "hello|hi",
+      "response": "Hello! How can I help you today?"
+    }
+  ]
+}

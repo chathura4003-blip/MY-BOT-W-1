@@ -1,53 +1,76 @@
-# 🛸 Premium MD — WhatsApp AI Bot
+# Modular WhatsApp Bot (Baileys MD)
 
-A world-class, feature-rich WhatsApp bot with a stunning Cyberpunk dashboard and advanced AI capabilities.
+Refactored Node.js WhatsApp bot with a modular architecture, JSON storage, dynamic commands/plugins/events, admin API, and real-time dashboard.
 
-## ✨ Premium Features
-- **Modern Dashboard**: Sleek glassmorphic admin panel with real-time monitoring.
-- **Auto-Bio Flux**: Automated profile status updates with system health.
-- **Elegant UI**: Sophisticated unicode message formatting.
-- **AI Integration**: Powered by advanced language models for chat and image gen.
+## Folder Structure
 
-## Prerequisites
-- Node.js (v16 or higher)
-- ffmpeg (for media processing)
+```
+.
+├── api/                 # Express API + Socket.IO
+├── commands/            # Reserved for custom command handlers
+├── config/              # App configuration modules
+├── core/                # Core engine (session, queue, events, logging, command manager)
+├── data/                # JSON storage (commands, users, sessions, logs, analytics, etc.)
+├── events/              # Event modules (message/command/join/leave listeners)
+├── panel/               # Admin dashboard static web UI
+├── plugins/             # Feature plugins (enable/disable at runtime)
+├── sessions/            # Baileys multi-session auth directories
+├── bot.js               # Backward-compatible bot bootstrap wrapper
+└── index.js             # App entrypoint
+```
 
-## Installation
+## Features
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/YOUR_USERNAME/Bot-Fixer.git
-    cd Bot-Fixer
-    ```
+- Modular core engine (session manager, command manager, plugin manager, event bus)
+- JSON-driven command system with:
+  - permissions (`user`, `admin`, `group`)
+  - cooldowns
+  - categories
+  - runtime updates without restart (`commands.json` watched)
+- Plugin system (`plugins/*.js`) with dynamic enable/disable via API
+- Event system (`events/*.js`) with runtime toggles
+- Admin API (Express):
+  - auth (JWT)
+  - status, logs, commands, plugins, events
+  - send message + broadcast queue
+  - restart bot
+  - multi-session add/remove
+- Admin Panel (web dashboard) for login, status, commands/plugins view, broadcast, live logs
+- Real-time events via Socket.IO
+- Multi-device / multi-session using Baileys auth folders
+- Logging + analytics in JSON files
+- Optional AI auto-reply rules (`data/ai-rules.json`)
+- No external DB (JSON-only persistence)
 
-2.  **Install dependencies**:
-    ```bash
-    npm install
-    # OR
-    pnpm install
-    ```
+## JSON Storage Files
 
-3.  **Configure environment variables**:
-    Copy `.env.example` to `.env` and fill in your details.
-    ```bash
-    cp .env.example .env
-    ```
+- `data/commands.json`
+- `data/users.json`
+- `data/sessions.json`
+- `data/logs.json`
+- `data/plugins.json`
+- `data/events.json`
+- `data/analytics.json`
+- `data/ai-rules.json`
 
-4.  **Start the bot**:
-    ```bash
-    npm start
-    ```
+## Run
 
-## Configuration
-Edit `config.js` or use environment variables:
-- `OWNER_NUMBER`: Your WhatsApp number (e.g., 94742514900)
-- `PREFIX`: Command prefix (default: `.`)
-- `BOT_NAME`: Name of your bot
+```bash
+npm install
+npm start
+```
 
-## Dashboard
-The bot includes a web dashboard accessible at `http://localhost:5000` (or your configured port).
-- Default Admin: `admin`
-- Default Password: `changeme123`
+Open panel:
+- `http://localhost:5000`
 
-## License
-MIT
+Default login:
+- username: `owner`
+- password: `owner123`
+
+> Change credentials via env: `ADMIN_USER`, `ADMIN_PASS`, `JWT_SECRET`.
+
+## Termux / VPS Notes
+
+- Works on low-resource deployments (in-memory queue + JSON storage).
+- No Redis / SQL required.
+- Sessions are persisted under `sessions/<sessionId>/`.

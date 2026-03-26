@@ -1,29 +1,16 @@
 'use strict';
 
-const path = require('path');
+const app = require('./config/app');
 
 module.exports = {
-    BOT_NAME: process.env.BOT_NAME || 'CHATHU MD',
-    OWNER_NUMBER: process.env.OWNER_NUMBER || '94742514900', // Default owner
-    PREFIX: process.env.PREFIX || '.',
-    PORT: parseInt(process.env.PORT) || 5000,
-    DASHBOARD_PORT: parseInt(process.env.DASHBOARD_PORT || process.env.PORT) || 5000,
-
-    ADMIN_USER: process.env.ADMIN_USER || 'admin',
-    ADMIN_PASS: process.env.ADMIN_PASS || 'admin123',
-    JWT_SECRET: process.env.JWT_SECRET || 'secret_token_change_it',
-
-    SESSION_DIR: path.join(__dirname, 'session'),
-    DOWNLOAD_DIR: path.join(__dirname, 'downloads'),
-
-    BROWSER: ['SupremeBot', 'Chrome', '131.0'],
-
-    AUTO_READ: process.env.AUTO_READ !== 'true',
-    AUTO_TYPING: process.env.AUTO_TYPING !== 'true',
-    NSFW_ENABLED: process.env.NSFW_ENABLED !== 'false',
-    WORK_MODE: process.env.WORK_MODE || 'public', // Set to 'public' to work for everyone
-
-    SEARCH_CACHE_TTL: 300000,
-    DOWNLOAD_CACHE_TTL: 1800000,
-    MSG_CACHE_TTL: 3600000,
+  BOT_NAME: app.bot.name,
+  PREFIX: app.bot.prefix,
+  OWNER_NUMBER: app.bot.ownerNumber,
+  JWT_SECRET: app.api.jwtSecret,
+  DASHBOARD_PORT: app.api.port,
+  PORT: app.api.port,
+  ADMIN_USER: app.admin.username,
+  ADMIN_PASS: app.admin.password,
+  SESSION_DIR: app.paths.sessionsDir,
+  BROWSER: app.bot.browser,
 };

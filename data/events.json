@@ -1,0 +1,8 @@
+{
+  "events": {
+    "message_received": { "enabled": true },
+    "user_join": { "enabled": true },
+    "user_leave": { "enabled": true },
+    "command_executed": { "enabled": true }
+  }
+}
