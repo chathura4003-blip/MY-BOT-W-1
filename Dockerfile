@@ -14,7 +14,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Pre-download yt-dlp for Linux (Application Root)
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /app/yt-dlp \
+RUN curl -L -f --silent -o /app/yt-dlp \
+    https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
     && chmod a+rx /app/yt-dlp
 
 # Copy package files and install dependencies
