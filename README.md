@@ -1,84 +1,56 @@
-# 🛸 Premium MD — WhatsApp AI Bot
+# 🌸 CHATHU MD Bot — v2.1.0 🌸
 
-A production-ready, feature-rich WhatsApp bot with a Cyberpunk dashboard and advanced AI/media tooling.
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-blue.svg)](https://github.com/WhiskeySockets/Baileys)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ Premium Features
-- **Modern Dashboard**: Glassmorphic admin panel with real-time telemetry.
-- **Auto-Bio Flux**: Automated profile status updates with uptime + memory.
-- **AI + Utility Commands**: Rich command set for chat, media, and admin workflows.
-- **Hardened Startup Checks**: Warns on weak/default credentials and risky mode settings.
-- **Smart Config Parsing**: Environment flags, ports, TTLs, and run mode are validated safely.
+**CHATHU MD** is a professional-grade, high-performance WhatsApp multi-device bot featuring the stunning **Cyber-Glass Admin Dashboard** (v3). Engineered for 24/7 stability, it provides a seamless management experience for both single and multiple accounts.
 
-## Prerequisites
-- Node.js **v18+** (recommended)
-- ffmpeg (for media processing)
+---
 
-## Installation
+## 💎 Key Features
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Bot-Fixer.git
-   cd Bot-Fixer
-   ```
+- **🌐 Cyber-Glass Admin Panel (v3)**: A beautiful, real-time web dashboard with glassmorphism aesthetics for full bot control.
+- **⚡ Cyber-Pulse Monitor**: High-precision real-time monitoring of Network (Rx/Tx) and System Memory (Node.js Heap).
+- **📱 Multi-Device Session Manager**: Link and manage multiple WhatsApp accounts concurrently with high-visibility pairing codes (phone number link) or QR scans.
+- **🛡️ Global Protections**: Integrated Anti-Link and Anti-Spam protection systems with dashboard toggle support.
+- **🌸 Premium Menu System**: Elegant, Sakura-themed command menu with 89+ powerful commands (Media, Search, Utility, Fun, NSFW).
+- **🔄 Auto-Self Healing**: Built-in anti-crash loop that recovers the system within 10 seconds of any fatal failure.
+- **💬 Broadcast Manager**: Send announcements to all groups or users with history tracking.
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+---
 
-3. **Create environment config**
-   ```bash
-   cp .env.example .env
-   ```
+## 🚀 Quick Start
 
-4. **Set secure values in `.env`**
-   - `ADMIN_PASS`
-   - `JWT_SECRET`
-   - `OWNER_NUMBER`
+### 📋 Prerequisites
 
-5. **Run the bot**
-   ```bash
-   npm start
-   ```
+- **Node.js**: 18.x or 20.x
+- **Git**: Installed for repository management
 
-## Configuration
-All runtime config is controlled in `config.js` through environment variables.
+### ⚙️ Installation
 
-### Core
-- `BOT_NAME`: Bot display name
-- `OWNER_NUMBER`: Owner WhatsApp number (digits only)
-- `PREFIX`: Command prefix
+```bash
+# Clone the repository
+git clone https://github.com/Chathura369/MY-BOT-V2.git
+cd MY-BOT-V2
 
-### Network
-- `PORT`: HTTP server port
-- `DASHBOARD_PORT`: Dashboard listener port
+# Install dependencies
+npm install
 
-### Security
-- `ADMIN_USER`: Dashboard username
-- `ADMIN_PASS`: Dashboard password (**must change in production**)
-- `JWT_SECRET`: Token secret (**must change in production**)
+# Start the command center
+npm start
+```
 
-### Feature Flags
-- `AUTO_READ=true|false`
-- `AUTO_TYPING=true|false`
-- `NSFW_ENABLED=true|false`
-- `WORK_MODE=public|private`
+Once started, open **`http://localhost:5000`** in your browser to access the Cyber-Glass Dashboard.
 
-### Performance
-- `SEARCH_CACHE_TTL`
-- `DOWNLOAD_CACHE_TTL`
-- `MSG_CACHE_TTL`
+---
 
-## Dashboard
-- URL: `http://localhost:<PORT>`
-- Default user: `admin`
-- Default password: `admin123` (only for local dev)
 
-## Deployment Notes (Pro)
-- Use strong env secrets and avoid defaults.
-- Keep `WORK_MODE=private` for restricted/personal deployments.
-- If ports differ (`PORT` vs `DASHBOARD_PORT`), confirm host/container mapping.
-- Review startup warnings in logs before going live.
+## 📜 License
 
-## License
-MIT
+Distributed under the **MIT License**. See `LICENSE` for more information.
+
+---
+
+**Developed with ❤️ by Chathura**  
+*Empowering your WhatsApp experience with speed and style.*
