@@ -299,11 +299,19 @@ function verifyAdminPassword(plaintext) {
         }
     }
 
-    // Constant-time compare for plaintext to avoid timing oracle.
+    // Constant-time compare for plaintext to avoid timing oracle. We pad both
+    // buffers to the same length before crypto.timingSafeEqual so an early
+    // length-mismatch return doesn't leak the stored password's length via
+    // response-time differences.
     const a = Buffer.from(plaintext);
     const b = Buffer.from(stored);
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(a, b);
+    const maxLen = Math.max(a.length, b.length, 1);
+    const aPadded = Buffer.alloc(maxLen);
+    const bPadded = Buffer.alloc(maxLen);
+    a.copy(aPadded);
+    b.copy(bPadded);
+    const eq = crypto.timingSafeEqual(aPadded, bPadded);
+    return a.length === b.length && eq;
 }
 
 function sendInvalidCredentials(res, options = {}) {

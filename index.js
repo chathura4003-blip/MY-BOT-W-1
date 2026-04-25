@@ -45,16 +45,24 @@ console.log = (...args) => {
     try { logger(args.map(a => String(a)).join(' ')); } catch {}
 };
 
-// Final safety net: never crash on uncaught Signal/decryption errors
+// Final safety net: swallow well-known benign Signal/decryption noise so it
+// doesn't spam the dashboard log, but for any other uncaught exception we log
+// and *exit* — after an uncaughtException Node's internal state is undefined
+// and it's unsafe to keep running (can corrupt db.json, leak FDs, etc.).
+// A process manager (pm2 / Docker --restart / systemd) should restart us.
 process.on('uncaughtException', (err) => {
     const msg = String(err?.message || err);
     if (NOISY_PATTERNS.some(re => re.test(msg))) return;
     _origConsoleError('[uncaughtException]', err);
+    try { logger(`[FATAL] uncaughtException — exiting: ${err?.stack || err?.message || err}`); } catch {}
+    // Give the logger a tick to flush before exiting.
+    setTimeout(() => process.exit(1), 100).unref();
 });
 process.on('unhandledRejection', (reason) => {
     const msg = String(reason?.message || reason);
     if (NOISY_PATTERNS.some(re => re.test(msg))) return;
     _origConsoleError('[unhandledRejection]', reason);
+    try { logger(`[WARN] unhandledRejection: ${reason?.stack || reason?.message || reason}`); } catch {}
 });
 
 const { startDashboard } = require('./dashboard');
