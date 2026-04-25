@@ -7,7 +7,9 @@ const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const si = require('systeminformation');
 const config = require('./config');
 const { PORT, ADMIN_USER, ADMIN_PASS, JWT_SECRET, DOWNLOAD_DIR } = config;
@@ -261,6 +263,47 @@ function clearLoginFailures(key) {
 
 function logAuthEvent(event, payload = {}) {
     logger(`[Auth] ${JSON.stringify({ event, ...payload })}`);
+    appendAuditEntry({ category: 'auth', event, ...payload });
+}
+
+// ── Audit log (last N entries persisted to db.json) ────────────────────────
+const AUDIT_LOG_LIMIT = 250;
+function appendAuditEntry(entry) {
+    try {
+        const list = Array.isArray(db.getSetting('audit_log')) ? db.getSetting('audit_log') : [];
+        list.unshift({ time: new Date().toISOString(), ...entry });
+        if (list.length > AUDIT_LOG_LIMIT) list.length = AUDIT_LOG_LIMIT;
+        db.setSetting('audit_log', list);
+    } catch (err) {
+        logger(`[Audit] failed to persist entry: ${err.message}`);
+    }
+}
+
+// ── Password verification (supports bcrypt hashes + plaintext) ─────────────
+const BCRYPT_PREFIX_RE = /^\$2[aby]\$/;
+
+function isBcryptHash(value) {
+    return typeof value === 'string' && BCRYPT_PREFIX_RE.test(value.trim());
+}
+
+function verifyAdminPassword(plaintext) {
+    if (typeof plaintext !== 'string' || !plaintext) return false;
+    const stored = String(ADMIN_PASS || '');
+    if (!stored) return false;
+
+    if (isBcryptHash(stored)) {
+        try {
+            return bcrypt.compareSync(plaintext, stored);
+        } catch {
+            return false;
+        }
+    }
+
+    // Constant-time compare for plaintext to avoid timing oracle.
+    const a = Buffer.from(plaintext);
+    const b = Buffer.from(stored);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
 }
 
 function sendInvalidCredentials(res, options = {}) {
@@ -476,6 +519,29 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false, dotfiles: 'ignore' }));
 
+// ── Generic audit logger for write operations ─────────────────────────────
+// Logs (method, path, status, user, ip) on successful 2xx writes to /bot-api/.
+// Skips noisy routes (auth attempts are logged separately, health is unauth'd).
+const AUDIT_SKIP_PATHS = new Set(['/bot-api/health', '/bot-api/auth/login']);
+app.use((req, res, next) => {
+    const isMutating = req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'OPTIONS';
+    if (!isMutating || !req.path.startsWith('/bot-api/') || AUDIT_SKIP_PATHS.has(req.path)) {
+        return next();
+    }
+    res.on('finish', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            appendAuditEntry({
+                category: 'api',
+                event: `${req.method} ${req.path}`,
+                user: req.admin?.user || null,
+                ip: getClientAddress(req),
+                status: res.statusCode,
+            });
+        }
+    });
+    next();
+});
+
 /**
  * Robust API handler wrapper to prevent unhandled rejections and maintain dashboard stability.
  */
@@ -506,6 +572,27 @@ for (const id of PAGE_IDS) {
         res.sendFile(path.join(__dirname, 'public', 'pages', `${id}.html`));
     });
 }
+
+// ── Public health probe (no auth — for Docker / Render / Fly health checks)
+app.get('/bot-api/health', (req, res) => {
+    const status = appState.getStatus();
+    const number = appState.getNumber();
+    const startedAt = appState.getConnectedAt() || null;
+    const uptime = Math.round(process.uptime());
+    const memUsedMB = Math.round(process.memoryUsage().rss / 1024 / 1024);
+
+    const ok = !!number || status === 'Connected' || status === 'Connecting' || status === 'Idle (Paused)' || status === 'Awaiting QR Scan' || status === 'Awaiting Pair Code';
+    res.status(ok ? 200 : 503).json({
+        ok,
+        status: status || 'Unknown',
+        number: number || null,
+        startedAt,
+        uptime,
+        memUsedMB,
+        version: require('./package.json').version,
+        node: process.version,
+    });
+});
 
 // ── JWT middleware ─────────────────────────────────────────────────────────
 function authMiddleware(req, res, next) {
@@ -551,10 +638,23 @@ app.post('/bot-api/auth/login', (req, res) => {
         return sendInvalidCredentials(res, { retryAfterMs });
     }
 
-    if (username === ADMIN_USER && password === ADMIN_PASS) {
+    const usernameMatch = typeof username === 'string'
+        && typeof ADMIN_USER === 'string'
+        && username.length === ADMIN_USER.length
+        && crypto.timingSafeEqual(Buffer.from(username), Buffer.from(ADMIN_USER));
+    if (usernameMatch && verifyAdminPassword(password)) {
         clearLoginFailures(key);
         const token = jwt.sign({ user: username }, JWT_SECRET, { expiresIn: '24h' });
-        return res.json({ token, username });
+        logAuthEvent('login_success', {
+            ip: getClientAddress(req),
+            username,
+        });
+        return res.json({
+            token,
+            username,
+            expiresIn: 24 * 60 * 60,
+            passwordHashed: isBcryptHash(ADMIN_PASS),
+        });
     }
 
     const failureState = recordLoginFailure(key, now);
@@ -1482,8 +1582,54 @@ app.get('/bot-api/logs', authMiddleware, (req, res) => {
 });
 app.delete('/bot-api/logs', authMiddleware, (req, res) => {
     appState.getLogs().length = 0;
+    appendAuditEntry({ category: 'logs', event: 'logs_cleared', user: req.admin?.user || null });
     res.json({ ok: true });
 });
+
+// ── Audit log ──────────────────────────────────────────────────────────────
+app.get('/bot-api/audit', authMiddleware, (req, res) => {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, AUDIT_LOG_LIMIT);
+    const list = Array.isArray(db.getSetting('audit_log')) ? db.getSetting('audit_log') : [];
+    res.json(list.slice(0, limit));
+});
+
+// ── Send-test-message (sanity-check a session from the dashboard) ──────────
+app.post('/bot-api/sessions/:id/send-test', authMiddleware, apiHandler(async (req, res) => {
+    const sessionId = normalizeSessionId(req.params.id);
+    const { sock, label } = getSocketForSession(sessionId);
+    if (!sock || !sock.user || !sock.user.id) {
+        return res.status(409).json({ error: `Session ${label || sessionId} is not connected` });
+    }
+
+    const target = String(req.body?.target || '').trim();
+    const message = String(req.body?.message || '').trim() || `Hi from ${label || sessionId} — dashboard test message at ${new Date().toLocaleString()}`;
+    if (!target) return res.status(400).json({ error: 'target (phone or @g.us) is required' });
+
+    let jid;
+    if (target.endsWith('@g.us') || target.endsWith('@s.whatsapp.net') || target.endsWith('@lid')) {
+        jid = target;
+    } else {
+        const norm = normalizeSriLankanPhoneNumber(target);
+        let digits = norm && norm.ok && norm.phone ? norm.phone : '';
+        if (!digits) digits = String(target).replace(/\D/g, '');
+        if (!digits) return res.status(400).json({ error: 'Could not parse target phone number' });
+        jid = `${digits}@s.whatsapp.net`;
+    }
+
+    try {
+        await sock.sendMessage(jid, { text: message });
+        appendAuditEntry({
+            category: 'message',
+            event: 'send_test',
+            user: req.admin?.user || null,
+            sessionId,
+            jid,
+        });
+        res.json({ ok: true, jid, sessionId });
+    } catch (err) {
+        res.status(502).json({ error: err.message || 'sendMessage failed', jid });
+    }
+}));
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {

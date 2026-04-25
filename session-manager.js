@@ -369,13 +369,20 @@ async function startSocket(id, entry) {
                 logger(`[Session ${id}] Closed (code ${code})`);
 
                 if (!loggedOut && !entry.qrPaused) {
-                    // Auto-reconnect after 5 seconds
+                    // Exponential backoff: 5s, 10s, 20s, 40s, 80s, then cap at 120s.
+                    entry.reconnectAttempts = (entry.reconnectAttempts || 0) + 1;
+                    const delay = Math.min(120000, 5000 * Math.pow(2, Math.min(entry.reconnectAttempts - 1, 5)));
                     entry.reconnectTimer = setTimeout(() => {
                         if (registry.has(id) && !registry.get(id).qrPaused) {
-                            logger(`[Session ${id}] Auto-reconnecting...`);
-                            startSocket(id, registry.get(id)).catch(e => logger(`[Session ${id}] Reconnect error: ${e.message}`));
+                            logger(`[Session ${id}] Auto-reconnecting (attempt ${entry.reconnectAttempts}, after ${Math.round(delay / 1000)}s)...`);
+                            startSocket(id, registry.get(id))
+                                .then(() => {
+                                    const e = registry.get(id);
+                                    if (e) e.reconnectAttempts = 0;
+                                })
+                                .catch(e => logger(`[Session ${id}] Reconnect error: ${e.message}`));
                         }
-                    }, 5000);
+                    }, delay);
                 } else if (loggedOut) {
                     if (entry.manualDisconnectKeep) {
                         entry.manualDisconnectKeep = false;

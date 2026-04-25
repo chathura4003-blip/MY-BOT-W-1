@@ -2400,4 +2400,294 @@
     if (typeof resetAutoReplyForm === 'function') try { resetAutoReplyForm(); } catch {}
       if (typeof resetSchedulerForm === 'function') try { resetSchedulerForm(); } catch {}
       if (CURRENT_PAGE && State.token) enterApp();
+
+    // ════════════════════════════════════════════════════════════════════════
+    // ====== PRO FEATURES (theme toggle, command palette, sysmetrics) ========
+    // ════════════════════════════════════════════════════════════════════════
+
+    // ----- Theme manager ----------------------------------------------------
+    (function initTheme() {
+      const KEY = 'chmd_theme';
+      const apply = (theme) => {
+        if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        else document.documentElement.removeAttribute('data-theme');
+      };
+      const stored = localStorage.getItem(KEY);
+      apply(stored === 'light' ? 'light' : 'dark');
+      window.toggleTheme = function () {
+        const cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+        const next = cur === 'light' ? 'dark' : 'light';
+        localStorage.setItem(KEY, next);
+        apply(next);
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) btn.textContent = next === 'light' ? '☀ Light' : '☾ Dark';
+      };
+    })();
+
+    // Inject theme toggle into sidebar (after the brand block) and a top-right hint
+    (function mountThemeButton() {
+      try {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar || document.getElementById('themeToggleBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'themeToggleBtn';
+        btn.className = 'theme-toggle';
+        btn.style.margin = '8px 16px';
+        btn.style.alignSelf = 'flex-start';
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        btn.textContent = isLight ? '☀ Light' : '☾ Dark';
+        btn.title = 'Toggle light/dark theme (Ctrl+Shift+L)';
+        btn.onclick = () => window.toggleTheme();
+        sidebar.appendChild(btn);
+      } catch {}
+    })();
+
+    // ----- Command palette --------------------------------------------------
+    (function mountPalette() {
+      if (document.getElementById('paletteBack')) return;
+      const back = document.createElement('div');
+      back.id = 'paletteBack';
+      back.className = 'palette-back';
+      back.innerHTML = `
+        <div class="palette" role="dialog" aria-label="Command palette">
+          <input id="paletteInput" type="text" placeholder="Jump to page or run a command…  (esc to close)" autocomplete="off" />
+          <ul id="paletteList"></ul>
+        </div>`;
+      document.body.appendChild(back);
+
+      const COMMANDS = [
+        { id: 'go-dashboard', label: 'Go to Dashboard', kbd: 'g d', run: () => location.href = '/dashboard' },
+        { id: 'go-sessions',  label: 'Go to Sessions',  kbd: 'g s', run: () => location.href = '/sessions' },
+        { id: 'go-users',     label: 'Go to Fleet / Users', kbd: 'g u', run: () => location.href = '/users' },
+        { id: 'go-groups',    label: 'Go to Groups', run: () => location.href = '/groups' },
+        { id: 'go-commands',  label: 'Go to Commands', run: () => location.href = '/commands' },
+        { id: 'go-broadcast', label: 'Go to Broadcast', run: () => location.href = '/broadcast' },
+        { id: 'go-autoreply', label: 'Go to Auto-Reply', run: () => location.href = '/autoreply' },
+        { id: 'go-scheduler', label: 'Go to Scheduler', run: () => location.href = '/scheduler' },
+        { id: 'go-files',     label: 'Go to Files', run: () => location.href = '/files' },
+        { id: 'go-settings',  label: 'Go to Settings', run: () => location.href = '/settings' },
+        { id: 'go-logs',      label: 'Go to Logs', run: () => location.href = '/logs' },
+        { id: 'theme',        label: 'Toggle light/dark theme', kbd: '⇧+L', run: () => window.toggleTheme() },
+        { id: 'reload-stats', label: 'Refresh stats now', run: () => { try { typeof loadStats === 'function' && loadStats(); } catch {} } },
+        { id: 'restart',      label: 'Restart bot…', run: () => { try { typeof restartBot === 'function' && restartBot(); } catch {} } },
+        { id: 'logout',       label: 'Sign out', run: () => { try { typeof logout === 'function' && logout(); } catch {} } },
+        { id: 'send-test',    label: 'Send a test message…', run: () => window.openTestMessageModal && window.openTestMessageModal() },
+      ];
+
+      const input = back.querySelector('#paletteInput');
+      const list = back.querySelector('#paletteList');
+      let active = 0;
+
+      function render(filter) {
+        const q = (filter || '').toLowerCase().trim();
+        const filtered = !q ? COMMANDS : COMMANDS.filter(c => c.label.toLowerCase().includes(q));
+        if (!filtered.length) {
+          list.innerHTML = '<div class="empty">No matches</div>';
+          return;
+        }
+        list.innerHTML = filtered.map((c, i) =>
+          `<li data-idx="${i}" class="${i === active ? 'active' : ''}">
+             <span>${c.label}</span>${c.kbd ? `<span class="kbd">${c.kbd}</span>` : ''}
+           </li>`
+        ).join('');
+        list.querySelectorAll('li').forEach((el, i) => {
+          el.addEventListener('mouseenter', () => { active = i; highlight(); });
+          el.addEventListener('click', () => run(filtered[i]));
+        });
+        return filtered;
+      }
+      function highlight() {
+        list.querySelectorAll('li').forEach((el, i) => el.classList.toggle('active', i === active));
+      }
+      function run(cmd) { close(); try { cmd && cmd.run && cmd.run(); } catch {} }
+      function open() {
+        active = 0; input.value = ''; render('');
+        back.classList.add('open');
+        setTimeout(() => input.focus(), 30);
+      }
+      function close() { back.classList.remove('open'); }
+
+      input.addEventListener('input', () => { active = 0; render(input.value); });
+      input.addEventListener('keydown', e => {
+        const filtered = render(input.value) || COMMANDS;
+        if (e.key === 'ArrowDown') { active = Math.min(filtered.length - 1, active + 1); highlight(); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { active = Math.max(0, active - 1); highlight(); e.preventDefault(); }
+        else if (e.key === 'Enter') { run(filtered[active]); }
+        else if (e.key === 'Escape') { close(); }
+      });
+      back.addEventListener('click', e => { if (e.target === back) close(); });
+
+      window.openCommandPalette = open;
+      window.closeCommandPalette = close;
+    })();
+
+    // ----- Keyboard shortcuts ---------------------------------------------
+    window.addEventListener('keydown', (e) => {
+      const target = e.target;
+      const inField = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (window.openCommandPalette) window.openCommandPalette();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        if (window.toggleTheme) window.toggleTheme();
+        return;
+      }
+      if (inField) return;
+      if (e.key === '/') {
+        const palette = document.getElementById('paletteBack');
+        if (palette && !palette.classList.contains('open')) {
+          e.preventDefault();
+          if (window.openCommandPalette) window.openCommandPalette();
+        }
+      }
+    });
+
+    // ----- Sysmetrics canvas chart ----------------------------------------
+    (function mountSysChart() {
+      const canvas = document.getElementById('sysChart');
+      if (!canvas) return;
+      const cpuSeries = [];
+      const memSeries = [];
+      const MAX = 60;
+
+      function pushSample(cpu, mem) {
+        cpuSeries.push(cpu); memSeries.push(mem);
+        if (cpuSeries.length > MAX) { cpuSeries.shift(); memSeries.shift(); }
+        draw();
+      }
+      function draw() {
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        const w = canvas.clientWidth || 600;
+        const h = canvas.clientHeight || 160;
+        if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+          canvas.width = w * dpr; canvas.height = h * dpr;
+          ctx.scale(dpr, dpr);
+        }
+        ctx.clearRect(0, 0, w, h);
+        // grid lines
+        const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--line-2').trim() || 'rgba(255,255,255,.08)';
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = (h - 16) * (i / 4) + 4;
+          ctx.beginPath(); ctx.moveTo(36, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+        // labels
+        const txt = getComputedStyle(document.documentElement).getPropertyValue('--txt-3').trim() || '#737373';
+        ctx.fillStyle = txt; ctx.font = '10px JetBrains Mono, monospace';
+        ['100', '75', '50', '25', '0'].forEach((v, i) => ctx.fillText(v, 4, 8 + (h - 16) * (i / 4)));
+
+        function plot(series, color) {
+          if (!series.length) return;
+          ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          series.forEach((v, i) => {
+            const x = 36 + ((w - 40) * i) / Math.max(MAX - 1, 1);
+            const y = 4 + (h - 16) * (1 - Math.max(0, Math.min(100, v)) / 100);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          // last point dot
+          const last = series[series.length - 1];
+          const lx = 36 + ((w - 40) * (series.length - 1)) / Math.max(MAX - 1, 1);
+          const ly = 4 + (h - 16) * (1 - Math.max(0, Math.min(100, last)) / 100);
+          ctx.fillStyle = color;
+          ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#00ff88';
+        const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim() || '#8b5cf6';
+        plot(cpuSeries, brand);
+        plot(memSeries, accent);
+
+        // legend
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillStyle = brand; ctx.fillText('● CPU', w - 130, 14);
+        ctx.fillStyle = accent; ctx.fillText('● Memory', w - 70, 14);
+      }
+
+      async function tick() {
+        try {
+          const s = await api('/bot-api/stats', { silent: true });
+          const cpu = parseFloat(s.cpuLoad) || 0;
+          const mem = parseFloat(s.memPercent) || 0;
+          pushSample(cpu, mem);
+        } catch {}
+      }
+      tick();
+      setInterval(tick, 5000);
+      window.addEventListener('resize', draw);
+    })();
+
+    // ----- Send Test Message panel ----------------------------------------
+    (function mountSendTest() {
+      if (document.getElementById('sendTestModal')) return;
+      const modal = document.createElement('div');
+      modal.className = 'modal-back';
+      modal.id = 'sendTestModal';
+      modal.innerHTML = `
+        <div class="modal">
+          <h3>Send Test Message</h3>
+          <p class="muted">Verify a session can deliver a message end-to-end.</p>
+          <div class="field"><label>Session</label>
+            <select class="input" id="testMsgSession"></select>
+          </div>
+          <div class="field"><label>Target (phone or @g.us JID)</label>
+            <input class="input" id="testMsgTarget" placeholder="947XXXXXXXX or 1203...@g.us" />
+          </div>
+          <div class="field"><label>Message</label>
+            <textarea class="input" id="testMsgBody" rows="3" placeholder="Hi from the dashboard!"></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn btn-ghost" onclick="closeModal('sendTestModal')">Cancel</button>
+            <button class="btn btn-primary" id="testMsgSendBtn">Send</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+
+      window.openTestMessageModal = function () {
+        const sel = document.getElementById('testMsgSession');
+        if (sel) {
+          const sessions = (State.data.sessions && State.data.sessions.length)
+            ? State.data.sessions
+            : [{ id: '__main__', label: 'Main Bot' }];
+          sel.innerHTML = sessions
+            .map(s => `<option value="${s.id || '__main__'}">${s.label || s.id || 'Main Bot'}</option>`)
+            .join('');
+        }
+        openModal('sendTestModal');
+      };
+
+      document.getElementById('testMsgSendBtn').addEventListener('click', async () => {
+        const sessionId = document.getElementById('testMsgSession').value || '__main__';
+        const target = document.getElementById('testMsgTarget').value.trim();
+        const message = document.getElementById('testMsgBody').value.trim();
+        if (!target) return toast('Target is required', 'error');
+        try {
+          await api(`/bot-api/sessions/${encodeURIComponent(sessionId)}/send-test`, {
+            method: 'POST',
+            body: JSON.stringify({ target, message }),
+          });
+          toast('Test message sent', 'success');
+          closeModal('sendTestModal');
+        } catch (e) {
+          toast(e.message || 'Send failed', 'error');
+        }
+      });
+    })();
+
+    // Expose a helper button on the Sessions page header (if present)
+    (function injectSendTestButton() {
+      const header = document.querySelector('#page-sessions .ph .actions');
+      if (!header || header.querySelector('[data-test-msg]')) return;
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary btn-sm';
+      btn.dataset.testMsg = '1';
+      btn.textContent = 'Send Test Message';
+      btn.onclick = () => window.openTestMessageModal && window.openTestMessageModal();
+      header.appendChild(btn);
+    })();
   
