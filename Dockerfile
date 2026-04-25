@@ -1,39 +1,58 @@
-# Use Node.js 20 as base for better dependency support
-FROM node:20
+# syntax=docker/dockerfile:1.6
 
-# Set working directory
+# ─── Stage 1: install production dependencies on a slim image ──────────────
+FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    ffmpeg \
-    python3 \
-    git \
-    curl \
-    ca-certificates \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Build deps + Python (for any node-gyp targets) and curl for yt-dlp download
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        python3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Pre-download yt-dlp for Linux (Application Root)
-RUN curl -L -f --silent -o /app/yt-dlp \
-    https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev --no-audit --no-fund
+
+# Pre-download yt-dlp once so the runtime image doesn't need network for it
+RUN curl -fsSL -o /app/yt-dlp \
+        https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
     && chmod a+rx /app/yt-dlp
 
-# Copy package files and install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install --production
 
-# Copy the rest of the application
+# ─── Stage 2: minimal runtime ──────────────────────────────────────────────
+FROM node:20-bookworm-slim AS runtime
+WORKDIR /app
+
+# Only ffmpeg + python3 are needed at runtime
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        ffmpeg \
+        python3 \
+        tini \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed deps and yt-dlp from build stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/yt-dlp ./yt-dlp
+
+# App source last so node_modules layer can be cached across rebuilds
 COPY . .
 
-# Ensure session directory exists for persistence
-RUN mkdir -p /app/session /app/downloads
+RUN mkdir -p /app/session /app/downloads /app/sessions
 
-# Expose the dashboard port
+ENV NODE_ENV=production \
+    PORT=5000 \
+    NODE_OPTIONS=--no-warnings
+
 EXPOSE 5000
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=5000
+# Container healthcheck hits the unauthenticated /bot-api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.PORT||5000)+'/bot-api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))" || exit 1
 
-# Start the bot using the optimized memory heap
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["npm", "start"]
