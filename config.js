@@ -21,8 +21,13 @@ module.exports = {
   PREFIX: process.env.PREFIX || ".",
   PORT: readInt(process.env.PORT, 5000),
   ADMIN_USER: readString(process.env.ADMIN_USER, "admin"),
-  ADMIN_PASS: readString(process.env.ADMIN_PASS),
-  JWT_SECRET: readString(process.env.JWT_SECRET),
+  // Fall back to the documented defaults so an upgrade with no .env edit
+  // doesn't lock the user out of the dashboard. Production deployments must
+  // override these — bcrypt-hash ADMIN_PASS with `npm run hash-pass` and set
+  // a long random JWT_SECRET. We log a loud warning at boot when defaults
+  // are in use (see index.js).
+  ADMIN_PASS: readString(process.env.ADMIN_PASS, DEFAULT_ADMIN_PASS),
+  JWT_SECRET: readString(process.env.JWT_SECRET, DEFAULT_JWT_SECRET),
   PREMIUM_CODE: process.env.PREMIUM_CODE || "CHATHU2026",
   SESSION_DIR: path.join(__dirname, "session"),
   DOWNLOAD_DIR: path.join(__dirname, "downloads"),

@@ -22,6 +22,23 @@ const { getPrefix, getAutoRead, getAutoTyping, getBotName, getAutoViewStatus, ge
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'pussy', 'whore', 'nigger'];
 const messageStore = [];
 const spamMap = new Map();
+const SPAM_WINDOW_MS = 5000;
+
+// Periodic spamMap prune. Without this the Map grows unboundedly across the
+// bot's lifetime since we only filter old timestamps inside an entry but never
+// drop the entry itself when a sender goes quiet.
+const spamMapSweep = setInterval(() => {
+    const now = Date.now();
+    for (const [key, timestamps] of spamMap) {
+        const fresh = timestamps.filter((ts) => now - ts < SPAM_WINDOW_MS);
+        if (fresh.length === 0) {
+            spamMap.delete(key);
+        } else if (fresh.length !== timestamps.length) {
+            spamMap.set(key, fresh);
+        }
+    }
+}, SPAM_WINDOW_MS * 2);
+spamMapSweep.unref();
 
 let activeSocket = null;
 let reconnectTimer = null;
@@ -483,18 +500,7 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
         : autoStatus !== false;
 
 
-    // Removed global early exit for !botEnabled so owners can wake it up    // Increment Processed Count
-    if (sessionId === '__main__') {
-        appState.incProcessedCount();
-    } else {
-        const sessionMgr = require('./session-manager');
-        const session = sessionMgr.get(sessionId);
-        if (session) {
-            sessionMgr.updateSessionMetrics(sessionId, { 
-                processedCount: (session.processedCount || 0) + 1 
-            });
-        }
-    }
+    // Removed global early exit for !botEnabled so owners can wake it up
 
     // Globally filter out backlog messages from the batch
     const startupGrace = 5; // 5 seconds grace period
@@ -522,6 +528,22 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
 
         return true;
     });
+
+    // Bump the "processed" metric only for messages that survived the backlog
+    // filter, so empty batches (all-stale reconnect replays) don't inflate it.
+    if (validMessages.length > 0) {
+        if (sessionId === '__main__') {
+            for (let i = 0; i < validMessages.length; i++) appState.incProcessedCount();
+        } else {
+            const sessionMgr = require('./session-manager');
+            const session = sessionMgr.get(sessionId);
+            if (session) {
+                sessionMgr.updateSessionMetrics(sessionId, {
+                    processedCount: (session.processedCount || 0) + validMessages.length
+                });
+            }
+        }
+    }
 
     // Messages filtered out by group protections / private mode in the first loop.
     // We collect their keys here so the second loop (command/auto-reply dispatch)
@@ -723,8 +745,9 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
             }
         }
 
-        // Apply global owner override
-        if (sender === '269922018025553@lid') resolvedSender = '94742514900@s.whatsapp.net';
+        // (LID-to-owner aliases now live in db.users — see the lookup above —
+        //  so deployments can configure their own mappings instead of carrying
+        //  a hardcoded LID/JID pair across all installations.)
 
         // Automaticaly update user metadata (Name and Last Seen)
         if (sender && sender !== 'status@broadcast') {
@@ -797,28 +820,48 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
             if ((groupSettings.antilink || groupSettings.antiLink) && /(https?:\/\/|chat\.whatsapp\.com)/i.test(text)) {
                 try {
                     const meta = await sock.groupMetadata(from);
-                    const isAdmin = meta.participants.find((participant) => participant.id === sender)?.admin;
-                    if (!isAdmin) {
-                        await sock.sendMessage(from, { delete: msg.key });
-                        await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                    const senderIsAdmin = meta.participants.find((p) => p.id === sender)?.admin;
+                    const botJid = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
+                    const botParticipant = botJid ? meta.participants.find((p) => p.id === botJid) : null;
+                    const botIsAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+
+                    if (!senderIsAdmin) {
+                        if (botIsAdmin) {
+                            await sock.sendMessage(from, { delete: msg.key });
+                            await sock.groupParticipantsUpdate(from, [sender], 'remove');
+                        } else {
+                            await sock.sendMessage(from, {
+                                text: '⚠️ Anti-link is enabled but I am not a group admin — promote me to remove links automatically.'
+                            }).catch(() => {});
+                        }
                         continue;
                     }
-                } catch {}
+                } catch (err) {
+                    logger(`[Anti-Link] Error: ${err.message}`);
+                }
             }
 
             if (groupSettings.antibad && BAD_WORDS.some((word) => text.toLowerCase().includes(word))) {
                 try {
                     const meta = await sock.groupMetadata(from);
-                    const isAdmin = meta.participants.find((participant) => participant.id === sender)?.admin;
-                    if (!isAdmin) {
-                        await sock.sendMessage(from, { delete: msg.key });
+                    const senderIsAdmin = meta.participants.find((p) => p.id === sender)?.admin;
+                    const botJid = sock.user?.id ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : null;
+                    const botParticipant = botJid ? meta.participants.find((p) => p.id === botJid) : null;
+                    const botIsAdmin = botParticipant?.admin === 'admin' || botParticipant?.admin === 'superadmin';
+
+                    if (!senderIsAdmin) {
+                        if (botIsAdmin) {
+                            await sock.sendMessage(from, { delete: msg.key });
+                        }
                         await sock.sendMessage(from, {
-                            text: `Warning @${sender.split('@')[0]}, this group does not allow bad words.`,
+                            text: `Warning @${sender.split('@')[0]}, this group does not allow bad words.${botIsAdmin ? '' : ' (promote me to admin so I can delete the message)'}`,
                             mentions: [sender]
-                        });
+                        }).catch(() => {});
                         continue;
                     }
-                } catch {}
+                } catch (err) {
+                    logger(`[Anti-Bad] Error: ${err.message}`);
+                }
             }
         }
 

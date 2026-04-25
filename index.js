@@ -64,7 +64,15 @@ const sessionManager = require('./session-manager');
 async function main() {
     try {
         logger('Initializing dashboard and bots...');
-        
+
+        const cfg = require('./config');
+        if (cfg.ADMIN_PASS === cfg.DEFAULT_ADMIN_PASS) {
+            logger('[Security] WARNING: ADMIN_PASS is using the built-in default. Set ADMIN_PASS in .env (preferably a bcrypt hash via `npm run hash-pass -- "<pass>"`) before exposing the dashboard.');
+        }
+        if (cfg.JWT_SECRET === cfg.DEFAULT_JWT_SECRET) {
+            logger('[Security] WARNING: JWT_SECRET is using the built-in default. Set JWT_SECRET in .env to a long random string before exposing the dashboard.');
+        }
+
         // Start the web dashboard
         await startDashboard();
         
