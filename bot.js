@@ -17,7 +17,7 @@ const { normalizeSriLankanPhoneNumber } = require('./lib/phone-normalizer');
 const { BROWSER, SESSION_DIR } = require('./config');
 const appState = require('./state');
 const db = require('./lib/db');
-const { getPrefix, getAutoRead, getAutoTyping, getBotName, getAutoViewStatus, getAutoReactStatus } = require('./lib/runtime-settings');
+const { getPrefix, getAutoRead, getAutoTyping, getBotName, getAutoViewStatus, getAutoReactStatus, getNsfwEnabled } = require('./lib/runtime-settings');
 
 const BAD_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'pussy', 'whore', 'nigger'];
 const messageStore = [];

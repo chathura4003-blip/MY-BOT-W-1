@@ -1053,25 +1053,9 @@ app.post('/bot-api/sessions/:id/disconnect', authMiddleware, async (req, res) =>
     res.json(result);
 });
 
-app.post('/bot-api/sessions/:id/settings', authMiddleware, async (req, res) => {
-    const { id } = req.params;
-    const body = req.body || {};
-    try {
-        if (id === '__main__') {
-            const current = db.getSetting('main_bot_settings') || {};
-            const next = { ...current, ...body };
-            db.setSetting('main_bot_settings', next);
-            db.flush();
-            const session = getMainSessionPayload();
-            io.emit('session:update', session);
-            return res.json({ ok: true, session });
-        }
-        const sessionMgr = require('./session-manager');
-        const result = await sessionMgr.updateSessionSettings(id, body);
-        if (result.error) return res.status(400).json(result);
-        res.json(result);
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// (POST /bot-api/sessions/:id/settings is registered earlier with the granular
+// handler that knows every override field; a duplicate generic-merge handler
+// used to live here and was unreachable.)
 
 
 // ── Broadcast ──────────────────────────────────────────────────────────────
