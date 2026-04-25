@@ -655,12 +655,10 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
             if (group) {
                 const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
-                if ((group.antiLink || group.antilink) && (text.includes('chat.whatsapp.com') || text.includes('http://') || text.includes('https://'))) {
-                    logger(`Anti-Link: Deleting link from ${pushName} in ${group.name}`);
-                    await sock.sendMessage(jid, { delete: msg.key });
-                    skippedMessageIds.add(msg.key?.id);
-                    continue;
-                }
+                // Anti-link is handled exclusively in the second (dispatch)
+                // loop below — that handler checks group-admin status and also
+                // verifies the bot itself is admin before trying to delete, so
+                // duplicating the check here would bypass those guards.
 
                 if (group.antiSpam) {
                     const now = Date.now();
@@ -783,6 +781,16 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
 
         cacheMsg(msg);
 
+        // Drop echoes of our own outbound messages before any group protections,
+        // command dispatch, or auto-reply logic runs. Line 779 already filters
+        // the easy cases (self + no prefix + not numeric); this catches the
+        // remaining echoed command/reply messages so counters and side-effects
+        // don't fire twice.
+        {
+            const selfId = sock.user?.id?.split(':')[0];
+            if (selfId && sender.startsWith(selfId)) continue;
+        }
+
         if (from.endsWith('@g.us') && text) {
             const groupSettings = db.get('groups', from) || {};
 
@@ -836,8 +844,6 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
                 }
             }
         }
-        const botNumber = sock.user?.id?.split(':')[0];
-        if (sender.startsWith(botNumber)) continue;
 
         if (!isCommand && !msg.key.fromMe && !text.startsWith(finalPrefix) && finalAutoReply) {
             const autoReplyRule = findAutoReply(text, { isGroupMessage: from.endsWith('@g.us') });
