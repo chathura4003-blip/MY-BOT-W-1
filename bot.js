@@ -523,8 +523,13 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
         return true;
     });
 
+    // Messages filtered out by group protections / private mode in the first loop.
+    // We collect their keys here so the second loop (command/auto-reply dispatch)
+    // honours those skips instead of double-processing.
+    const skippedMessageIds = new Set();
+
     for (const msg of validMessages) {
-        if (!msg.message) continue;
+        if (!msg.message) { skippedMessageIds.add(msg.key?.id); continue; }
 
         const jid = msg.key.remoteJid;
         const fromMe = msg.key.fromMe;
@@ -634,12 +639,14 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
                 }, readDelay);
             }
 
+            skippedMessageIds.add(msg.key?.id);
             continue;
         }
 
         // Private Mode Check
         const isUserOwner = db.isUserBanned(sender) ? false : (msg.key.fromMe || require('./lib/utils').isOwner(sender, owner));
         if (!isUserOwner && (workMode === 'self' || (workMode === 'private' && isGroup))) {
+            skippedMessageIds.add(msg.key?.id);
             continue;
         }
 
@@ -651,6 +658,7 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
                 if ((group.antiLink || group.antilink) && (text.includes('chat.whatsapp.com') || text.includes('http://') || text.includes('https://'))) {
                     logger(`Anti-Link: Deleting link from ${pushName} in ${group.name}`);
                     await sock.sendMessage(jid, { delete: msg.key });
+                    skippedMessageIds.add(msg.key?.id);
                     continue;
                 }
 
@@ -662,12 +670,14 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
                     spamMap.set(spamKey, recentMessages);
                     if (recentMessages.length > 4) {
                         logger(`Anti-Spam: Skipping message from ${pushName} in ${group.name}`);
+                        skippedMessageIds.add(msg.key?.id);
                         continue;
                     }
                 }
 
                 if (group.isMuted && text.startsWith(getPrefix())) {
                     logger(`Mute: Ignoring command in ${group.name}`);
+                    skippedMessageIds.add(msg.key?.id);
                     continue;
                 }
             }
@@ -685,6 +695,10 @@ async function handleMessages(sock, messageBatch, sessionId = '__main__') {
     }
 
     for (const msg of validMessages) {
+        // Honour skips from the protections loop above (anti-link / anti-spam /
+        // mute / private-mode / status broadcasts) so muted-group commands and
+        // spam-filtered messages don't sneak through here.
+        if (skippedMessageIds.has(msg.key?.id)) continue;
         const from = msg.key.remoteJid;
         if (from === 'status@broadcast') continue;
 
